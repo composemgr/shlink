@@ -1,0 +1,78 @@
+# nginx proxy address - http://172.17.0.1:60142
+
+name: shlink
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: shlinkio/shlink:stable
+    container_name: shlink-app
+    domainname: ${BASE_DOMAIN_NAME:-}
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    environment:
+      PORT: 80
+      IS_HTTPS_ENABLED: false
+      TIMEZONE: ${TZ:-America/New_York}
+      GEOLITE_LICENSE_KEY: kjh23ljkbndskj345
+      DEFAULT_DOMAIN: ${BASE_DOMAIN_NAME:-$HOSTNAME}
+      INITIAL_API_KEY: ${APP_API_TOKEN:-uXnghuEoChgbV9YzaazMIj8v8U6bf9VH}
+      DEFAULT_SHORT_CODES_LENGTH: 6
+      AUTO_RESOLVE_TITLES: true
+      SHORT_URL_TRAILING_SLASH: true
+      REDIRECT_STATUS_CODE: 301
+      DEFAULT_INVALID_SHORT_URL_REDIRECT: 
+      ROBOTS_ALLOW_ALL_SHORT_URLS: true
+      REDIS_SERVERS: 
+      DB_HOST: shlink-db
+      DB_DRIVER: mysql
+      DB_NAME: shlink
+      DB_USER: root
+      DB_PASSWORD: ${DB_ADMIN_PASS:-8tWi7K4M3w5D0TdEqwLEVbf3H5RQViBm}
+    ports:
+      - '172.17.0.1:60142:80'
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - shlink
+
+  db:
+    image: mariadb:latest
+    container_name: shlink-db
+    hostname: shlink-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      MARIADB_ALLOW_EMPTY_PASSWORD: false
+      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-8tWi7K4M3w5D0TdEqwLEVbf3H5RQViBm}
+    volumes:
+      - './rootfs/db/mariadb:/var/lib/mysql'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'healthcheck.sh',
+          '--su-mysql',
+          '--connect',
+          '--innodb_initialized',
+        ]
+      start_period: 1m
+      start_interval: 10s
+      interval: 1m
+      timeout: 5s
+      retries: 3
+    networks:
+      - shlink
+
+networks:
+  shlink:
+    name: shlink
+    external: false

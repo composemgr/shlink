@@ -35,6 +35,8 @@ services:
       DB_NAME: ${DB_CREATE_DATABASE_NAME:-shlink}
       DB_USER: ${DB_USER_NAME:-shlink}
       DB_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+      CONTAINER_NAME: shlink-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     ports:
       - '172.17.0.1:60142:80'
     depends_on:
@@ -42,6 +44,24 @@ services:
         condition: service_healthy
     networks:
       - shlink
+      - proxy
+      - cloudflare
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://shlink-app:80'
+      - 'cloudflare.hostname=shlink.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.shlink-app.entrypoints=http'
+      - 'traefik.http.routers.shlink-app-secure.tls=true'
+      - 'traefik.http.routers.shlink-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.shlink-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.shlink-app.middlewares=shlink-app-https-redirect'
+      - 'traefik.http.routers.shlink-app-secure.entrypoints=https'
+      - 'traefik.http.routers.shlink-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.shlink-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.shlink-app-secure.service=shlink-app'
+      - 'traefik.http.services.shlink-app.loadbalancer.server.port=80'
 
   db:
     image: mariadb:latest
@@ -57,6 +77,7 @@ services:
       MARIADB_USER: ${DB_USER_NAME:-shlink}
       MARIADB_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
       MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_admin_password}
+      CONTAINER_NAME: shlink-db
     volumes:
       - './volumes/data/db/mariadb/shlink:/var/lib/mysql'
     healthcheck:
@@ -80,3 +101,7 @@ networks:
   shlink:
     name: shlink
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true

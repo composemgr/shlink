@@ -11,29 +11,30 @@ services:
   app:
     image: shlinkio/shlink:stable
     container_name: shlink-app
-    domainname: ${BASE_DOMAIN_NAME:-}
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
     hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
     pull_policy: always
+    logging: *default-logging
     environment:
       PORT: 80
       IS_HTTPS_ENABLED: false
       TIMEZONE: ${TZ:-America/New_York}
-      GEOLITE_LICENSE_KEY: kjh23ljkbndskj345
-      DEFAULT_DOMAIN: ${BASE_DOMAIN_NAME:-$HOSTNAME}
-      INITIAL_API_KEY: ${APP_API_TOKEN:-uXnghuEoChgbV9YzaazMIj8v8U6bf9VH}
+      GEOLITE_LICENSE_KEY: ${GEOLITE_LICENSE_KEY:-}
+      DEFAULT_DOMAIN: ${BASE_DOMAIN_NAME:-example.com}
+      INITIAL_API_KEY: ${APP_API_TOKEN:-changeme_api_token_min_32_chars}
       DEFAULT_SHORT_CODES_LENGTH: 6
       AUTO_RESOLVE_TITLES: true
       SHORT_URL_TRAILING_SLASH: true
       REDIRECT_STATUS_CODE: 301
-      DEFAULT_INVALID_SHORT_URL_REDIRECT: 
+      DEFAULT_INVALID_SHORT_URL_REDIRECT: ${DEFAULT_INVALID_SHORT_URL_REDIRECT:-}
       ROBOTS_ALLOW_ALL_SHORT_URLS: true
-      REDIS_SERVERS: 
+      REDIS_SERVERS: ${REDIS_SERVERS:-}
       DB_HOST: shlink-db
       DB_DRIVER: mysql
-      DB_NAME: shlink
-      DB_USER: root
-      DB_PASSWORD: ${DB_ADMIN_PASS:-8tWi7K4M3w5D0TdEqwLEVbf3H5RQViBm}
+      DB_NAME: ${DB_CREATE_DATABASE_NAME:-shlink}
+      DB_USER: ${DB_USER_NAME:-shlink}
+      DB_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
     ports:
       - '172.17.0.1:60142:80'
     depends_on:
@@ -52,9 +53,12 @@ services:
     environment:
       TZ: ${TZ:-America/New_York}
       MARIADB_ALLOW_EMPTY_PASSWORD: false
-      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-8tWi7K4M3w5D0TdEqwLEVbf3H5RQViBm}
+      MARIADB_DATABASE: ${DB_CREATE_DATABASE_NAME:-shlink}
+      MARIADB_USER: ${DB_USER_NAME:-shlink}
+      MARIADB_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-changeme_admin_password}
     volumes:
-      - './volumes/data/db/mariadb:/var/lib/mysql'
+      - './volumes/data/db/mariadb/shlink:/var/lib/mysql'
     healthcheck:
       test:
         [

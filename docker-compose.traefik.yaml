@@ -1,0 +1,98 @@
+name: shlink
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: shlinkio/shlink:latest
+    container_name: shlink-app
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: shlink-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      IS_HTTPS_ENABLED: true
+      TIMEZONE: ${TZ:-America/New_York}
+      DEFAULT_DOMAIN: ${BASE_HOST_NAME:-$HOSTNAME}
+      DEFAULT_ORGANIZATION_NAME: ${APP_ORG_NAME:-Shlink}
+      INITIAL_API_KEY: ${APP_API_TOKEN:-replace-with-a-random-32-char-string}
+      GEOLITE_LICENSE_KEY: ${GEOLITE_LICENSE_KEY:-}
+      DEFAULT_SHORT_CODES_LENGTH: ${SHLINK_SHORT_CODES_LENGTH:-6}
+      AUTO_RESOLVE_TITLES: true
+      SHORT_URL_TRAILING_SLASH: true
+      REDIRECT_STATUS_CODE: ${SHLINK_REDIRECT_STATUS_CODE:-301}
+      DEFAULT_INVALID_SHORT_URL_REDIRECT: ${DEFAULT_INVALID_SHORT_URL_REDIRECT:-}
+      ROBOTS_ALLOW_ALL_SHORT_URLS: true
+      REDIS_SERVERS: ${REDIS_SERVERS:-}
+      DB_HOST: db
+      DB_DRIVER: mysql
+      DB_NAME: ${DB_CREATE_DATABASE_NAME:-shlink}
+      DB_USER: ${DB_USER_NAME:-shlink}
+      DB_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=traefik'
+      - 'traefik.http.routers.shlink-app.entrypoints=http'
+      - 'traefik.http.routers.shlink-app.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.shlink-app.middlewares=shlink-app-https-redirect'
+      - 'traefik.http.middlewares.shlink-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.shlink-app-secure.entrypoints=https'
+      - 'traefik.http.routers.shlink-app-secure.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.shlink-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.shlink-app-secure.service=shlink-app'
+      - 'traefik.http.services.shlink-app.loadbalancer.server.port=8080'
+    networks:
+      - shlink
+      - traefik
+
+  db:
+    image: mariadb:latest
+    container_name: shlink-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: shlink-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: shlink-db
+      MARIADB_ALLOW_EMPTY_PASSWORD: false
+      MARIADB_DATABASE: ${DB_CREATE_DATABASE_NAME:-shlink}
+      MARIADB_USER: ${DB_USER_NAME:-shlink}
+      MARIADB_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+      MARIADB_ROOT_PASSWORD: ${DB_ADMIN_PASS:-replace-with-a-random-password}
+    volumes:
+      - './volumes/db/mariadb/shlink:/var/lib/mysql:z'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'healthcheck.sh',
+          '--su-mysql',
+          '--connect',
+          '--innodb_initialized',
+        ]
+      start_period: 1m
+      start_interval: 10s
+      interval: 1m
+      timeout: 5s
+      retries: 3
+    networks:
+      - shlink
+
+networks:
+  shlink:
+    name: shlink
+    external: false
+  traefik:
+    external: true
